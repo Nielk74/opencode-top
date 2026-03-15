@@ -150,35 +150,24 @@ function SessionsScreenInner({
         setSearchMode(true);
         setSearchQuery("");
         setSelectedIndex(0);
+        setGlobalMatchPos(-1);
         return;
       }
       if (key.escape && searchQuery) {
         setSearchQuery("");
         setSelectedIndex(0);
+        setGlobalMatchPos(-1);
         return;
       }
       if (input === "n" || input === "N") {
         const matches = globalMatchesRef.current;
         if (matches.length === 0) return;
         const pos = globalMatchPosRef.current;
-        const cur = clampedIndexRef.current;
-        // Find current position in globalMatches based on current session
-        let nextPos: number;
-        if (input === "n") {
-          // Next match after current session+position
-          const after = matches.findIndex((m) => m.flatNodeIndex > cur || (m.flatNodeIndex === cur && pos === -1));
-          nextPos = after >= 0 ? after : 0;
-        } else {
-          // Previous match before current session
-          let before = -1;
-          for (let i = matches.length - 1; i >= 0; i--) {
-            if (matches[i].flatNodeIndex < cur || (matches[i].flatNodeIndex === cur && pos > 0)) {
-              before = i;
-              break;
-            }
-          }
-          nextPos = before >= 0 ? before : matches.length - 1;
-        }
+        const nextPos = input === "n"
+          ? (pos + 1) % matches.length
+          : pos < 0
+            ? matches.length - 1
+            : (pos - 1 + matches.length) % matches.length;
         const match = matches[nextPos];
         setGlobalMatchPos(nextPos);
         setSelectedIndex(match.flatNodeIndex);
@@ -223,7 +212,7 @@ function SessionsScreenInner({
                 <Text color={colors.accent}>/</Text>
                 <TextInput
                   value={searchQuery}
-                  onChange={(v) => { setSearchQuery(v); setSelectedIndex(0); }}
+                  onChange={(v) => { setSearchQuery(v); setSelectedIndex(0); setGlobalMatchPos(-1); }}
                   onSubmit={() => setSearchMode(false)}
                   focus={searchMode}
                 />
