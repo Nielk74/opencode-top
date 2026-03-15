@@ -6,3 +6,4 @@ build.mjs
 stub-devtools.js
 .dockerignore
 bin/octop.mjs
+.playwright-mcp/

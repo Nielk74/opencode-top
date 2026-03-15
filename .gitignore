@@ -24,3 +24,6 @@ Thumbs.db
 
 # Exports
 exports/
+
+# Playwright MCP artifacts
+.playwright-mcp/
