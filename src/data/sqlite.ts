@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { z } from "zod";
 import { TokenUsage, type Session, type Interaction, type MessagePart } from "../core/types";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -26,77 +27,76 @@ interface DbPart {
   data: string;
 }
 
-// Real message.data schema from OpenCode
-interface RealMessageData {
-  id?: string;
-  parentID?: string;
-  role?: "assistant" | "user";
-  agent?: string;
-  mode?: string;
-  modelID?: string;
-  providerID?: string;
-  time?: {
-    created?: number;
-    completed?: number;
-  };
-  tokens?: {
-    input?: number;
-    output?: number;
-    reasoning?: number;
-    cache?: {
-      read?: number;
-      write?: number;
-    };
-  };
-  cost?: number;
-  finish?: string;
-  // Legacy fields (older messages may still have these)
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    cache_read_input_tokens?: number;
-    cache_write_input_tokens?: number;
-  };
-  model?: string;
-  stop_reason?: string;
-}
+const MessageDataSchema = z.object({
+  id: z.string().optional(),
+  parentID: z.string().optional(),
+  role: z.enum(["assistant", "user"]).optional(),
+  agent: z.string().optional(),
+  mode: z.string().optional(),
+  modelID: z.string().optional(),
+  providerID: z.string().optional(),
+  time: z.object({
+    created: z.number().optional(),
+    completed: z.number().optional(),
+  }).optional(),
+  tokens: z.object({
+    input: z.number().optional(),
+    output: z.number().optional(),
+    reasoning: z.number().optional(),
+    cache: z.object({
+      read: z.number().optional(),
+      write: z.number().optional(),
+    }).optional(),
+  }).optional(),
+  cost: z.number().optional(),
+  finish: z.string().optional(),
+  usage: z.object({
+    input_tokens: z.number().optional(),
+    output_tokens: z.number().optional(),
+    cache_read_input_tokens: z.number().optional(),
+    cache_write_input_tokens: z.number().optional(),
+  }).optional(),
+  model: z.string().optional(),
+  stop_reason: z.string().optional(),
+}).passthrough();
 
-// Real part.data schema from OpenCode
-interface RealPartData {
-  type?: string;
-  text?: string;
-  time?: {
-    start?: number;
-    end?: number;
-  };
-  // tool call fields
-  callID?: string;
-  tool?: string;
-  state?: {
-    status?: string;
-    input?: Record<string, unknown>;
-    output?: string;
-    title?: string;
-    time?: {
-      start?: number;
-      end?: number;
-    };
-    metadata?: {
-      exit?: number;
-      exitCode?: number;
-      truncated?: boolean;
-    };
-  };
-  // patch fields
-  hash?: string;
-  files?: string[];
-}
+type RealMessageData = z.infer<typeof MessageDataSchema>;
+
+const PartDataSchema = z.object({
+  type: z.string().optional(),
+  text: z.string().optional(),
+  time: z.object({
+    start: z.number().optional(),
+    end: z.number().optional(),
+  }).optional(),
+  callID: z.string().optional(),
+  tool: z.string().optional(),
+  state: z.object({
+    status: z.string().optional(),
+    input: z.record(z.unknown()).optional(),
+    output: z.string().optional(),
+    title: z.string().optional(),
+    time: z.object({
+      start: z.number().optional(),
+      end: z.number().optional(),
+    }).optional(),
+    metadata: z.object({
+      exit: z.number().optional(),
+      exitCode: z.number().optional(),
+      truncated: z.boolean().optional(),
+    }).optional(),
+  }).optional(),
+  hash: z.string().optional(),
+  files: z.array(z.string()).optional(),
+}).passthrough();
+
+type RealPartData = z.infer<typeof PartDataSchema>;
 
 export function getDbPath(): string {
   return path.join(os.homedir(), ".local", "share", "opencode", "opencode.db");
 }
 
-export function loadSessions(dbPath: string = getDbPath()): Session[] {
+export function loadSessions(dbPath: string = getDbPath(), sinceMessageTime?: number): { sessions: Session[]; maxMessageTime: number } {
   const db = new Database(dbPath, { readonly: true });
 
   const sessions = db
@@ -111,21 +111,48 @@ export function loadSessions(dbPath: string = getDbPath()): Session[] {
   `)
     .all() as DbSession[];
 
-  const sessionIds = sessions.map((s) => s.id);
+  let sessionIds: string[];
+  if (sinceMessageTime !== undefined) {
+    // Only reload sessions that have messages newer than sinceMessageTime
+    const updatedSessionIds = db
+      .prepare(`SELECT DISTINCT session_id FROM message WHERE time_created > ?`)
+      .all(sinceMessageTime) as { session_id: string }[];
+    const updatedSet = new Set(updatedSessionIds.map((r) => r.session_id));
+    sessionIds = sessions.filter((s) => updatedSet.has(s.id)).map((s) => s.id);
+  } else {
+    sessionIds = sessions.map((s) => s.id);
+  }
+
   const interactions = loadInteractions(db, sessionIds);
+
+  const maxTimeRow = db
+    .prepare(`SELECT MAX(time_created) as maxTime FROM message`)
+    .get() as { maxTime: number | null };
+  const maxMessageTime = maxTimeRow?.maxTime ?? 0;
+
   db.close();
 
-  return sessions.map((s) => ({
-    id: s.id,
-    parentId: s.parent_id,
-    projectId: s.project_id,
-    projectName: s.project_name,
-    title: s.title,
-    timeCreated: s.time_created,
-    timeArchived: s.time_archived,
-    interactions: interactions.get(s.id) ?? [],
-    source: "sqlite" as const,
-  }));
+  // On incremental load, only return sessions that actually had new data loaded.
+  // Returning all sessions with interactions.get(s.id) ?? [] would wipe interactions
+  // for sessions that weren't in the incremental query.
+  const sessionsToReturn = sinceMessageTime !== undefined
+    ? sessions.filter((s) => interactions.has(s.id))
+    : sessions;
+
+  return {
+    sessions: sessionsToReturn.map((s) => ({
+      id: s.id,
+      parentId: s.parent_id,
+      projectId: s.project_id,
+      projectName: s.project_name,
+      title: s.title,
+      timeCreated: s.time_created,
+      timeArchived: s.time_archived,
+      interactions: interactions.get(s.id) ?? [],
+      source: "sqlite" as const,
+    })),
+    maxMessageTime,
+  };
 }
 
 function loadInteractions(
@@ -211,7 +238,9 @@ function loadParts(db: Database.Database, messageIds: string[]): Map<string, Mes
 
 function parsePart(data: string): MessagePart | null {
   try {
-    const json = JSON.parse(data) as RealPartData;
+    const parsed = PartDataSchema.safeParse(JSON.parse(data));
+    if (!parsed.success) return null;
+    const json: RealPartData = parsed.data;
     const timeStart = json.time?.start ?? 0;
     const timeEnd = json.time?.end ?? 0;
 
@@ -282,7 +311,9 @@ function parseMessageData(
   parts: MessagePart[]
 ): Interaction | null {
   try {
-    const json = JSON.parse(data) as RealMessageData;
+    const parsed = MessageDataSchema.safeParse(JSON.parse(data));
+    if (!parsed.success) return null;
+    const json: RealMessageData = parsed.data;
 
     // Support both new schema (tokens.*) and legacy schema (usage.*)
     const newTokens = json.tokens;

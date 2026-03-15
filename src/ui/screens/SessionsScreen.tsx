@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, memo } from "react";
 import { Box, Text, useInput } from "ink";
+import TextInput from "ink-text-input";
 import { colors } from "../theme";
 import { StatusBar } from "../components/StatusBar";
 import { AgentTree } from "../components/AgentTree";
 import { DetailsPanel } from "../components/DetailsPanel";
 import { MessagesPanel } from "../components/MessagesPanel";
-import type { Workflow, AgentNode, FlatNode } from "../../core/types";
+import type { Workflow, AgentNode, FlatNode, Session } from "../../core/types";
 
 interface SessionsScreenProps {
   workflows: Workflow[];
@@ -33,6 +34,23 @@ function flattenWorkflow(workflow: Workflow, workflowIndex: number): FlatNode[] 
   return nodes;
 }
 
+function sessionMatchesQuery(session: Session, query: string): boolean {
+  const q = query.toLowerCase();
+  for (const interaction of session.interactions) {
+    for (const part of interaction.parts) {
+      if (part.type === "text" && part.text.toLowerCase().includes(q)) return true;
+      if (part.type === "tool") {
+        if (part.toolName.toLowerCase().includes(q)) return true;
+        if (part.output && part.output.toLowerCase().includes(q)) return true;
+        const inputStr = JSON.stringify(part.input).toLowerCase();
+        if (inputStr.includes(q)) return true;
+      }
+    }
+  }
+  if (session.title && session.title.toLowerCase().includes(q)) return true;
+  return false;
+}
+
 function SessionsScreenInner({
   workflows,
   isActive,
@@ -41,10 +59,17 @@ function SessionsScreenInner({
 }: SessionsScreenProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [rightMode, setRightMode] = useState<RightMode>("stats");
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const flatNodes = useMemo(() => {
+  const allFlatNodes = useMemo(() => {
     return workflows.flatMap((w, i) => flattenWorkflow(w, i));
   }, [workflows]);
+
+  const flatNodes = useMemo(() => {
+    if (!searchQuery.trim()) return allFlatNodes;
+    return allFlatNodes.filter((n) => sessionMatchesQuery(n.session, searchQuery));
+  }, [allFlatNodes, searchQuery]);
 
   const clampedIndex = Math.min(selectedIndex, Math.max(0, flatNodes.length - 1));
   const selectedNode = flatNodes[clampedIndex] ?? null;
@@ -80,6 +105,30 @@ function SessionsScreenInner({
   // SessionsScreen only handles: tab switch, tree nav (stats mode), session switch (messages mode)
   useInput(
     (input, key) => {
+      if (searchMode) {
+        if (key.escape) {
+          setSearchMode(false);
+          setSearchQuery("");
+          setSelectedIndex(0);
+        }
+        // Enter confirms search and switches to messages mode to navigate occurrences
+        if (key.return && searchQuery.trim()) {
+          setSearchMode(false);
+          setRightMode("messages");
+        }
+        return;
+      }
+      if (input === "/") {
+        setSearchMode(true);
+        setSearchQuery("");
+        setSelectedIndex(0);
+        return;
+      }
+      if (key.escape && searchQuery) {
+        setSearchQuery("");
+        setSelectedIndex(0);
+        return;
+      }
       if (key.tab) {
         setRightMode((m) => (m === "stats" ? "messages" : "stats"));
         return;
@@ -109,6 +158,27 @@ function SessionsScreenInner({
           borderColor={colors.borderBright}
           flexDirection="column"
         >
+          {/* Search bar */}
+          <Box height={1} paddingX={1} flexDirection="row">
+            {searchMode ? (
+              <>
+                <Text color={colors.accent}>/</Text>
+                <TextInput
+                  value={searchQuery}
+                  onChange={(v) => { setSearchQuery(v); setSelectedIndex(0); }}
+                  onSubmit={() => setSearchMode(false)}
+                  focus={searchMode}
+                />
+              </>
+            ) : searchQuery ? (
+              <>
+                <Text color={colors.warning}>/{searchQuery}</Text>
+                <Text color={colors.textDim}> ({flatNodes.length}/{allFlatNodes.length})</Text>
+              </>
+            ) : (
+              <Text color={colors.textDim}>Sessions ({allFlatNodes.length}) · /:search</Text>
+            )}
+          </Box>
           <AgentTree
             workflows={workflows}
             selectedId={selectedNode?.id ?? null}
@@ -117,7 +187,7 @@ function SessionsScreenInner({
               const idx = flatNodes.findIndex((n) => n.id === id);
               if (idx >= 0) handleSelect(idx);
             }}
-            maxHeight={innerHeight}
+            maxHeight={innerHeight - 1}
           />
         </Box>
 
@@ -153,6 +223,7 @@ function SessionsScreenInner({
               session={selectedNode?.session ?? null}
               maxHeight={msgHeight}
               isActive={isActive && rightMode === "messages"}
+              searchQuery={searchQuery}
             />
           )}
         </Box>
@@ -160,9 +231,11 @@ function SessionsScreenInner({
 
       <StatusBar
         hints={
-          rightMode === "messages"
-            ? "j/k:scroll  d/u:½page  g/G:top/bot  Enter:expand  [:prev  ]:next  Tab:stats  q:quit"
-            : "j/k:nav  g/G:top/bot  Tab:messages  2:tools  3:overview  r:refresh  q:quit"
+          searchMode
+            ? "Type to search · Enter:confirm · Esc:clear"
+            : rightMode === "messages"
+            ? "j/k:scroll  d/u:½page  g/G:top/bot  Enter:expand  f:filter  n/N:match  [:prev  ]:next  Tab:stats  q:quit"
+            : "j/k:nav  g/G:top/bot  /:search  Tab:messages  2:tools  3:overview  r:refresh  q:quit"
         }
       />
     </Box>

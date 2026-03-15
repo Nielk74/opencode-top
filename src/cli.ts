@@ -51,7 +51,7 @@ program
   .action((options) => {
     const limit = Number.parseInt(options.limit, 10);
     try {
-      const sessions = loadSessions(getDbPath());
+      const { sessions } = loadSessions(getDbPath());
       const workflows = groupSessionsToWorkflows(sessions);
 
       const shown = workflows.slice(0, limit);

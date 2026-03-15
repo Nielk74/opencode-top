@@ -5,7 +5,7 @@ import { TabBar } from "./components/TabBar";
 import { SessionsScreen } from "./screens/SessionsScreen";
 import { ToolsScreen } from "./screens/ToolsScreen";
 import { OverviewScreen } from "./screens/OverviewScreen";
-import type { Workflow, ScreenId } from "../core/types";
+import type { Workflow, Session, ScreenId } from "../core/types";
 import { loadSessions, sessionExists } from "../data/sqlite";
 import { groupSessionsToWorkflows } from "../core/agents";
 
@@ -26,8 +26,8 @@ function workflowsEqual(a: Workflow[], b: Workflow[]): boolean {
 export function App({ refreshInterval = 2000 }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
-  const terminalHeight = stdout?.rows ?? 24;
-  const terminalWidth = stdout?.columns ?? 80;
+  const [terminalHeight, setTerminalHeight] = useState(stdout?.rows ?? 24);
+  const [terminalWidth, setTerminalWidth] = useState(stdout?.columns ?? 80);
 
   // Enter alternate screen buffer on mount — prevents Ink's clearTerminal flash.
   // Ink triggers \x1b[2J\x1b[3J\x1b[H whenever outputHeight >= stdout.rows.
@@ -42,12 +42,29 @@ export function App({ refreshInterval = 2000 }: AppProps) {
     };
   }, [stdout]);
 
+  // Terminal resize handling
+  useEffect(() => {
+    const onResize = () => {
+      if (stdout) {
+        setTerminalHeight(stdout.rows ?? 24);
+        setTerminalWidth(stdout.columns ?? 80);
+      }
+    };
+    process.stdout.on("resize", onResize);
+    return () => {
+      process.stdout.off("resize", onResize);
+    };
+  }, [stdout]);
+
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [screen, setScreen] = useState<ScreenId>("sessions");
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const workflowsRef = useRef<Workflow[]>([]);
+  const sessionsRef = useRef<Map<string, Session>>(new Map());
+  const lastMessageTimeRef = useRef<number>(0);
+  const isFirstLoadRef = useRef(true);
   const mountedRef = useRef(false);
 
   const loadData = useCallback(() => {
@@ -59,8 +76,27 @@ export function App({ refreshInterval = 2000 }: AppProps) {
     }
 
     try {
-      const sessions = loadSessions();
-      const grouped = groupSessionsToWorkflows(sessions);
+      const sinceTime = isFirstLoadRef.current ? undefined : lastMessageTimeRef.current;
+      const { sessions: newSessions, maxMessageTime } = loadSessions(undefined, sinceTime);
+
+      // On first load, populate the map; on incremental, merge updated sessions
+      if (isFirstLoadRef.current) {
+        sessionsRef.current = new Map(newSessions.map((s) => [s.id, s]));
+        isFirstLoadRef.current = false;
+      } else {
+        if (newSessions.length === 0) {
+          // No new data, skip re-grouping
+          return;
+        }
+        for (const s of newSessions) {
+          sessionsRef.current.set(s.id, s);
+        }
+      }
+
+      lastMessageTimeRef.current = maxMessageTime;
+
+      const allSessions = Array.from(sessionsRef.current.values());
+      const grouped = groupSessionsToWorkflows(allSessions);
 
       if (!workflowsEqual(workflowsRef.current, grouped)) {
         workflowsRef.current = grouped;
