@@ -2,7 +2,7 @@
 
 Monitor your [OpenCode](https://opencode.ai) AI coding sessions in real-time — token usage, costs, agent chains, tool calls, and more.
 
-![opencode-top TUI](https://raw.githubusercontent.com/Nielk74/opencode-top/main/screenshot.svg)
+![opencode-top TUI](https://raw.githubusercontent.com/Nielk74/opencode-top/main/preview.svg)
 
 ## Install
 
