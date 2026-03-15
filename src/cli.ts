@@ -8,7 +8,9 @@ import { groupSessionsToWorkflows } from "./core/agents";
 import { getWorkflowCostSingle, getSessionDuration } from "./core/session";
 import { getPricing } from "./data/pricing";
 
-const pkg = { version: "3.0.0", name: "ocmonitor" };
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string; name: string };
 
 program
   .name(pkg.name)
