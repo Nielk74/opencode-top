@@ -1,0 +1,8 @@
+122,123c122,125
+<             this.options.stdout.write(ansiEscapes.clearTerminal + this.fullStaticOutput + output);
+<             this.lastOutput = output;
+---
+>             if (output !== this.lastOutput) {
+>                 this.log(output);
+>                 this.lastOutput = output;
+>             }

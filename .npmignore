@@ -1,0 +1,8 @@
+src/
+*.tgz
+biome.json
+tsconfig*.json
+build.mjs
+stub-devtools.js
+.dockerignore
+bin/octop.mjs
