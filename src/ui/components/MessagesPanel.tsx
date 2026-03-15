@@ -8,9 +8,10 @@ interface MessagesPanelProps {
   maxHeight: number;
   isActive: boolean;
   searchQuery?: string;
+  jumpToLine?: { line: number; seq: number }; // when set/changed, snap cursor+scroll to this line index
 }
 
-type MsgLine =
+export type MsgLine =
   | { id: string; kind: "header"; modelId: string; agent: string | null; duration: string; time: string; tokensIn: number; tokensOut: number; cumTokens: number }
   | { id: string; kind: "tool"; callId: string; icon: string; iconColor: string; name: string; title: string; right: string; expanded: boolean; rawInput: string; rawOutput: string; cumTokens: number }
   | { id: string; kind: "tool-detail"; label: string; value: string; isSection: boolean; cumTokens: number }
@@ -18,7 +19,7 @@ type MsgLine =
   | { id: string; kind: "reasoning-header"; reasoningId: string; preview: string; charCount: number; expanded: boolean; cumTokens: number }
   | { id: string; kind: "reasoning"; text: string; cumTokens: number };
 
-function buildLines(session: Session, contentWidth: number, expandedIds: Set<string>, expandedReasoningIds: Set<string>): MsgLine[] {
+export function buildLines(session: Session, contentWidth: number, expandedIds: Set<string>, expandedReasoningIds: Set<string>): MsgLine[] {
   const lines: MsgLine[] = [];
   let cumTokens = 0;
 
@@ -154,7 +155,7 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max - 1) + "…";
 }
 
-function lineMatchesQuery(line: MsgLine, q: string): boolean {
+export function lineMatchesQuery(line: MsgLine, q: string): boolean {
   switch (line.kind) {
     case "text": return line.text.toLowerCase().includes(q);
     case "tool":
@@ -185,7 +186,7 @@ function HighlightText({ text, query, baseColor, highlightColor = colors.accent 
   );
 }
 
-function MessagesPanelInner({ session, maxHeight, isActive, searchQuery = "" }: MessagesPanelProps) {
+function MessagesPanelInner({ session, maxHeight, isActive, searchQuery = "", jumpToLine }: MessagesPanelProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(new Set());
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -200,6 +201,29 @@ function MessagesPanelInner({ session, maxHeight, isActive, searchQuery = "" }: 
     setCursor(0);
     setFilter("all");
   }, [session?.id]);
+
+  // When jumpToLine changes (driven externally by n/N), snap to that line
+  useEffect(() => {
+    if (jumpToLine === undefined) return;
+    const target = jumpToLine.line;
+    // Auto-expand tool at target line if match is in input/output
+    const lines = filteredLinesRef.current;
+    const targetLine = lines[target];
+    if (targetLine?.kind === "tool" && !targetLine.expanded) {
+      const sq = searchQueryRef.current.toLowerCase();
+      if (targetLine.rawInput.toLowerCase().includes(sq) || targetLine.rawOutput.toLowerCase().includes(sq)) {
+        setExpandedIds((prev) => { const s = new Set(prev); s.add(targetLine.callId); return s; });
+      }
+    }
+    setCursor(target);
+    setScrollOffset((o) => {
+      const vh = viewHeightRef.current;
+      const mo = maxOffsetRef.current;
+      if (target < o) return target;
+      if (target >= o + vh) return Math.min(mo, target - Math.floor(vh / 2));
+      return o;
+    });
+  }, [jumpToLine]);
 
   const contentWidth = 80;
   const viewHeight = maxHeight - 1; // minus the counter row
@@ -314,35 +338,6 @@ function MessagesPanelInner({ session, maxHeight, isActive, searchQuery = "" }: 
       setCursor(0);
       return;
     }
-    if (input === "n" || input === "N") {
-      const indices = matchIndicesRef.current;
-      if (indices.length === 0) return;
-      const cur = clampedCursorRef.current;
-      const vh = viewHeightRef.current;
-      const mo = maxOffsetRef.current;
-      let next: number;
-      if (input === "n") {
-        next = indices.find((i) => i > cur) ?? indices[0];
-      } else {
-        const rev = [...indices].reverse();
-        next = rev.find((i) => i < cur) ?? indices[indices.length - 1];
-      }
-      setCursor(next);
-      setScrollOffset((o) => {
-        if (next < o) return next;
-        if (next >= o + vh) return Math.min(mo, next - Math.floor(vh / 2));
-        return o;
-      });
-      // Auto-expand tool if match is in its input/output
-      const nextLine = filteredLinesRef.current[next];
-      if (nextLine?.kind === "tool" && !nextLine.expanded) {
-        const sq2 = searchQueryRef.current.toLowerCase();
-        if (nextLine.rawInput.toLowerCase().includes(sq2) || nextLine.rawOutput.toLowerCase().includes(sq2)) {
-          setExpandedIds((prev) => { const s = new Set(prev); s.add(nextLine.callId); return s; });
-        }
-      }
-      return;
-    }
     if (key.return) {
       const line = filteredLines[clampedCursor];
       if (line?.kind === "tool") {
@@ -415,7 +410,6 @@ function MessagesPanelInner({ session, maxHeight, isActive, searchQuery = "" }: 
                 ? `match ${matchIndices.indexOf(clampedCursor) + 1}/${matchIndices.length}`
                 : `${matchIndices.length} matches`}
             </Text>
-            <Text color={colors.textDim}> n/N:jump</Text>
           </>
         )}
         <Box flexGrow={1} />

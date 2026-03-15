@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useCallback, memo } from "react";
+import React, { useState, useMemo, useCallback, useRef, memo } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { colors } from "../theme";
 import { StatusBar } from "../components/StatusBar";
 import { AgentTree } from "../components/AgentTree";
 import { DetailsPanel } from "../components/DetailsPanel";
-import { MessagesPanel } from "../components/MessagesPanel";
+import { MessagesPanel, buildLines, lineMatchesQuery } from "../components/MessagesPanel";
 import type { Workflow, AgentNode, FlatNode, Session } from "../../core/types";
 
 interface SessionsScreenProps {
@@ -61,6 +61,10 @@ function SessionsScreenInner({
   const [rightMode, setRightMode] = useState<RightMode>("stats");
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [globalMatchPos, setGlobalMatchPos] = useState(-1); // index into globalMatches
+  // jumpToLine: {line, seq} — seq always increments so the effect fires even for same line
+  const [jumpToLine, setJumpToLine] = useState<{ line: number; seq: number } | undefined>(undefined);
+  const jumpSeqRef = useRef(0);
 
   const allFlatNodes = useMemo(() => {
     return workflows.flatMap((w, i) => flattenWorkflow(w, i));
@@ -70,6 +74,23 @@ function SessionsScreenInner({
     if (!searchQuery.trim()) return allFlatNodes;
     return allFlatNodes.filter((n) => sessionMatchesQuery(n.session, searchQuery));
   }, [allFlatNodes, searchQuery]);
+
+  // Global match list: [{flatNodeIndex, lineIndex}] across all matching sessions
+  const globalMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const result: { flatNodeIndex: number; lineIndex: number }[] = [];
+    for (let fi = 0; fi < flatNodes.length; fi++) {
+      const session = flatNodes[fi].session;
+      const lines = buildLines(session, 80, new Set(), new Set());
+      for (let li = 0; li < lines.length; li++) {
+        if (lineMatchesQuery(lines[li], q)) {
+          result.push({ flatNodeIndex: fi, lineIndex: li });
+        }
+      }
+    }
+    return result;
+  }, [flatNodes, searchQuery]);
 
   const clampedIndex = Math.min(selectedIndex, Math.max(0, flatNodes.length - 1));
   const selectedNode = flatNodes[clampedIndex] ?? null;
@@ -102,6 +123,13 @@ function SessionsScreenInner({
     setSelectedIndex(index);
   }, []);
 
+  const globalMatchesRef = useRef(globalMatches);
+  globalMatchesRef.current = globalMatches;
+  const globalMatchPosRef = useRef(globalMatchPos);
+  globalMatchPosRef.current = globalMatchPos;
+  const clampedIndexRef = useRef(clampedIndex);
+  clampedIndexRef.current = clampedIndex;
+
   // SessionsScreen only handles: tab switch, tree nav (stats mode), session switch (messages mode)
   useInput(
     (input, key) => {
@@ -127,6 +155,36 @@ function SessionsScreenInner({
       if (key.escape && searchQuery) {
         setSearchQuery("");
         setSelectedIndex(0);
+        return;
+      }
+      if (input === "n" || input === "N") {
+        const matches = globalMatchesRef.current;
+        if (matches.length === 0) return;
+        const pos = globalMatchPosRef.current;
+        const cur = clampedIndexRef.current;
+        // Find current position in globalMatches based on current session
+        let nextPos: number;
+        if (input === "n") {
+          // Next match after current session+position
+          const after = matches.findIndex((m) => m.flatNodeIndex > cur || (m.flatNodeIndex === cur && pos === -1));
+          nextPos = after >= 0 ? after : 0;
+        } else {
+          // Previous match before current session
+          let before = -1;
+          for (let i = matches.length - 1; i >= 0; i--) {
+            if (matches[i].flatNodeIndex < cur || (matches[i].flatNodeIndex === cur && pos > 0)) {
+              before = i;
+              break;
+            }
+          }
+          nextPos = before >= 0 ? before : matches.length - 1;
+        }
+        const match = matches[nextPos];
+        setGlobalMatchPos(nextPos);
+        setSelectedIndex(match.flatNodeIndex);
+        setRightMode("messages");
+        jumpSeqRef.current += 1;
+        setJumpToLine({ line: match.lineIndex, seq: jumpSeqRef.current });
         return;
       }
       if (key.tab) {
@@ -173,7 +231,12 @@ function SessionsScreenInner({
             ) : searchQuery ? (
               <>
                 <Text color={colors.warning}>/{searchQuery}</Text>
-                <Text color={colors.textDim}> ({flatNodes.length}/{allFlatNodes.length})</Text>
+                <Text color={colors.textDim}> {flatNodes.length} sessions</Text>
+                {globalMatches.length > 0 && (
+                  <Text color={colors.teal}>
+                    {" "}· {globalMatchPos >= 0 ? `${globalMatchPos + 1}/` : ""}{globalMatches.length} hits
+                  </Text>
+                )}
               </>
             ) : (
               <Text color={colors.textDim}>Sessions ({allFlatNodes.length}) · /:search</Text>
@@ -224,6 +287,7 @@ function SessionsScreenInner({
               maxHeight={msgHeight}
               isActive={isActive && rightMode === "messages"}
               searchQuery={searchQuery}
+              jumpToLine={jumpToLine}
             />
           )}
         </Box>
@@ -234,8 +298,8 @@ function SessionsScreenInner({
           searchMode
             ? "Type to search · Enter:confirm · Esc:clear"
             : rightMode === "messages"
-            ? "j/k:scroll  d/u:½page  g/G:top/bot  Enter:expand  f:filter  n/N:match  [:prev  ]:next  Tab:stats  q:quit"
-            : "j/k:nav  g/G:top/bot  /:search  Tab:messages  2:tools  3:overview  r:refresh  q:quit"
+            ? `j/k:scroll  d/u:½page  g/G:top/bot  Enter:expand  f:filter${searchQuery ? "  n/N:match" : ""}  [:prev  ]:next  Tab:stats  q:quit`
+            : `j/k:nav  g/G:top/bot  /:search${searchQuery ? "  n/N:match" : ""}  Tab:messages  2:tools  3:overview  r:refresh  q:quit`
         }
       />
     </Box>
