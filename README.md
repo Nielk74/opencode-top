@@ -2,7 +2,7 @@
 
 Monitor your [OpenCode](https://opencode.ai) AI coding sessions in real-time — token usage, costs, agent chains, tool calls, and more.
 
-![opencode-top TUI](https://raw.githubusercontent.com/Nielk74/ocmonitor-share/main/screenshot.svg)
+![opencode-top TUI](https://raw.githubusercontent.com/Nielk74/opencode-top/main/screenshot.svg)
 
 ## Install
 
@@ -68,8 +68,8 @@ Requires OpenCode to have been run at least once (reads from `~/.local/share/ope
 ## Development
 
 ```bash
-git clone https://github.com/Nielk74/ocmonitor-share
-cd ocmonitor-share
+git clone https://github.com/Nielk74/opencode-top
+cd opencode-top
 npm install
 npm start live   # run from source with tsx
 ```
