@@ -2,15 +2,33 @@
 import React from "react";
 import { render } from "ink";
 import { program } from "commander";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { join, dirname } from "path";
 import { App } from "./ui/App";
 import { loadSessions, getDbPath } from "./data/sqlite";
 import { groupSessionsToWorkflows } from "./core/agents";
 import { getWorkflowCostSingle, getSessionDuration } from "./core/session";
 import { getPricing } from "./data/pricing";
 
-declare const __PKG_VERSION__: string;
-declare const __PKG_NAME__: string;
-const pkg = { version: __PKG_VERSION__, name: __PKG_NAME__ };
+declare const __PKG_VERSION__: string | undefined;
+declare const __PKG_NAME__: string | undefined;
+
+// In bundled form (npm run build), esbuild replaces __PKG_VERSION__ / __PKG_NAME__.
+// In dev (npm start / tsx), those defines are absent — read package.json directly.
+function devPkg(): { version: string; name: string } {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    return JSON.parse(readFileSync(pkgPath, "utf8")) as { version: string; name: string };
+  } catch {
+    return { version: "dev", name: "opencode-top" };
+  }
+}
+
+const pkg =
+  typeof __PKG_VERSION__ !== "undefined" && typeof __PKG_NAME__ !== "undefined"
+    ? { version: __PKG_VERSION__, name: __PKG_NAME__ }
+    : devPkg();
 
 program
   .name(pkg.name)

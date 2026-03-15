@@ -1,17 +1,23 @@
 export const colors = {
-  bg: "#1a1a2e",
-  bgSecondary: "#16213e",
-  border: "#0f3460",
-  accent: "#e94560",
-  accentDim: "#533483",
-  text: "#eaeaea",
-  textDim: "#888",
+  bg: "#0a0d0a",
+  bgSecondary: "#0f130f",
+  bgHighlight: "#162016",
+  border: "#1e2e1e",
+  borderBright: "#2d4a2d",
+  accent: "#4ade80",       // bright green — primary accent
+  accentDim: "#22543d",
+  accentAlt: "#86efac",    // light green
+  text: "#d4e8d4",         // slightly green-tinted white
+  textDim: "#527a52",
+  textMuted: "#2d4a2d",
   success: "#4ade80",
   warning: "#fbbf24",
   error: "#f87171",
-  info: "#60a5fa",
-  purple: "#a855f7",
-  cyan: "#22d3ee",
+  info: "#6ee7b7",         // mint/emerald
+  purple: "#a3e635",       // lime — replaces purple for section headers
+  cyan: "#34d399",         // emerald
+  teal: "#2dd4bf",
+  peach: "#86efac",        // light green instead of orange
 } as const;
 
 export const tokens = {

@@ -1,11 +1,14 @@
-import React, { useMemo, memo } from "react";
-import { Box, Text } from "ink";
+import React, { useMemo, memo, useState } from "react";
+import { Box, Text, useInput } from "ink";
 import { colors } from "../theme";
 import { StatusBar } from "../components/StatusBar";
 import { SparkLine } from "../components/SparkLine";
 import type { Workflow } from "../../core/types";
 import { computeOverviewStats, buildSparkSeries } from "../../core/session";
 import { getAllPricing } from "../../data/pricing";
+
+type TimeFilter = 1 | 7 | 30 | 90 | 0; // 1 = today, 0 = all time
+const TIME_FILTER_OPTIONS: TimeFilter[] = [1, 7, 30, 90, 0];
 
 interface OverviewScreenProps {
   workflows: Workflow[];
@@ -34,7 +37,7 @@ function StatRow({ label, value, color = colors.text }: { label: string; value: 
 function SectionHeader({ title }: { title: string }) {
   return (
     <Box marginTop={1}>
-      <Text color={colors.purple} bold>{title}</Text>
+      <Text color={colors.purple} bold>── {title.toUpperCase()} </Text>
     </Box>
   );
 }
@@ -68,8 +71,8 @@ function HBar({
       <Box width={labelWidth}>
         <Text color={colors.text}>{truncate(label, labelWidth - 1)}</Text>
       </Box>
-      <Text color={barColor}>{"█".repeat(filled)}</Text>
-      <Text color={colors.border}>{"░".repeat(empty)}</Text>
+      <Text color={barColor}>{"▓".repeat(filled)}</Text>
+      <Text color={colors.textMuted}>{"░".repeat(empty)}</Text>
       <Text color={colors.textDim}> {value}{pctStr}</Text>
     </Box>
   );
@@ -98,17 +101,70 @@ function ErrorBar({
       <Box width={labelWidth}>
         <Text color={colors.text}>{truncate(label, labelWidth - 1)}</Text>
       </Box>
-      <Text color={colors.success}>{"█".repeat(okFilled)}</Text>
-      <Text color={errors > 0 ? colors.error : colors.border}>{"█".repeat(errFilled)}</Text>
-      <Text color={colors.textDim}> {calls} calls</Text>
-      {errors > 0 && <Text color={colors.error}> {errors} err ({errPct}%)</Text>}
+      <Text color={colors.teal}>{"▓".repeat(okFilled)}</Text>
+      <Text color={errors > 0 ? colors.error : colors.textMuted}>{"▓".repeat(errFilled)}</Text>
+      <Text color={colors.textDim}> {calls}</Text>
+      {errors > 0 && <Text color={colors.error}> ✗{errors} ({errPct}%)</Text>}
     </Box>
   );
 }
 
 function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth }: OverviewScreenProps) {
   const pricing = useMemo(() => getAllPricing(), []);
-  const stats = useMemo(() => computeOverviewStats(workflows, pricing), [workflows, pricing]);
+
+  // Filters
+  const [timeFilterIdx, setTimeFilterIdx] = useState(0);
+  const [projectFilterIdx, setProjectFilterIdx] = useState(0); // 0 = all projects
+
+  const timeFilter: TimeFilter = TIME_FILTER_OPTIONS[timeFilterIdx];
+
+  // All distinct projects (sorted)
+  const allProjects = useMemo(() => {
+    const projects = new Set<string>();
+    for (const w of workflows) {
+      const p = w.mainSession.projectName ?? "Unknown";
+      projects.add(p);
+    }
+    return Array.from(projects).sort();
+  }, [workflows]);
+
+  const selectedProject = projectFilterIdx === 0 ? null : allProjects[projectFilterIdx - 1] ?? null;
+
+  // Apply filters
+  const filteredWorkflows = useMemo(() => {
+    let cutoff = 0;
+    if (timeFilter === 1) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      cutoff = today.getTime();
+    } else if (timeFilter > 1) {
+      cutoff = Date.now() - timeFilter * 86_400_000;
+    }
+    return workflows.filter((w) => {
+      const ts = w.mainSession.timeCreated;
+      if (cutoff > 0 && (ts === null || ts < cutoff)) return false;
+      if (selectedProject !== null) {
+        const p = w.mainSession.projectName ?? "Unknown";
+        if (p !== selectedProject) return false;
+      }
+      return true;
+    });
+  }, [workflows, timeFilter, selectedProject]);
+
+  useInput((input) => {
+    if (!isActive) return;
+    if (input === "t") {
+      setTimeFilterIdx((i) => (i + 1) % TIME_FILTER_OPTIONS.length);
+    }
+    if (input === "p") {
+      setProjectFilterIdx((i) => (i + 1) % (allProjects.length + 1));
+    }
+    if (input === "P") {
+      setProjectFilterIdx((i) => (i - 1 + allProjects.length + 1) % (allProjects.length + 1));
+    }
+  }, { isActive });
+
+  const stats = useMemo(() => computeOverviewStats(filteredWorkflows, pricing), [filteredWorkflows, pricing]);
 
   const topModels = useMemo(() =>
     Array.from(stats.modelBreakdown.entries())
@@ -158,9 +214,23 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
   return (
     <Box flexDirection="column" width={terminalWidth} height={contentHeight}>
       <Box paddingX={1} flexDirection="row">
-        <Text color={colors.accent} bold>Overview</Text>
+        <Text color={colors.accent} bold>◆ OVERVIEW</Text>
         <Box flexGrow={1} />
-        <Text color={colors.textDim}>{workflows.length} workflows  {stats.totalTokens.total > 0 ? formatTokens(stats.totalTokens.total) + " tokens" : ""}</Text>
+        <Text color={colors.textMuted}>{filteredWorkflows.length}/{workflows.length} workflows</Text>
+        {stats.totalTokens.total > 0 && <Text color={colors.textMuted}>  {formatTokens(stats.totalTokens.total)} tokens</Text>}
+      </Box>
+
+      {/* Filter bar */}
+      <Box paddingX={1} flexDirection="row">
+        <Text color={colors.textMuted}>filter: </Text>
+        <Text color={timeFilter === 0 ? colors.accent : colors.teal} bold>
+          {timeFilter === 0 ? "all time" : timeFilter === 1 ? "today" : `last ${timeFilter}d`}
+        </Text>
+        <Text color={colors.textMuted}>  ·  </Text>
+        <Text color={selectedProject ? colors.peach : colors.textMuted}>
+          {selectedProject ? truncate(selectedProject, 24) : "all projects"}
+        </Text>
+        <Text color={colors.textMuted}> (t/p)</Text>
       </Box>
 
       <Box flexDirection="row" flexGrow={1} paddingX={1}>
@@ -177,7 +247,7 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
 
           <SectionHeader title="Token trend (7d)" />
           <Box flexDirection="row">
-            <SparkLine values={weeklyTokenValues} color={colors.cyan} />
+            <SparkLine values={weeklyTokenValues} color={colors.accentAlt} />
           </Box>
           <Box flexDirection="row">
             <Text color={colors.textDim}>{stats.weeklyTokens[0]?.date.slice(3) ?? ""}</Text>
@@ -189,7 +259,7 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
 
           <SectionHeader title="Sessions (7d)" />
           <Box flexDirection="row">
-            <SparkLine values={weeklySessionValues} color={colors.accent} />
+            <SparkLine values={weeklySessionValues} color={colors.purple} />
           </Box>
           <Box flexDirection="row">
             <Text color={colors.textDim}>{stats.weeklySessions[0]?.date.slice(3) ?? ""}</Text>
@@ -200,7 +270,7 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
           </Box>
 
           <SectionHeader title="Hourly activity" />
-          <Text color={colors.warning}>{hourSpark}</Text>
+          <Text color={colors.teal}>{hourSpark}</Text>
           <Box flexDirection="row">
             <Text color={colors.textDim}>00</Text>
             <Box flexGrow={1} />
@@ -241,10 +311,10 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
                 <Box width={10}>
                   <Text color={colors.text}>{truncate(name, 9)}</Text>
                 </Box>
-                <Text color={data.errors > 0 ? colors.warning : colors.info}>
-                  {"█".repeat(Math.max(1, Math.round((data.calls / maxToolCalls) * 12)))}
+                <Text color={data.errors > 0 ? colors.peach : colors.accentAlt}>
+                  {"▓".repeat(Math.max(1, Math.round((data.calls / maxToolCalls) * 12)))}
                 </Text>
-                <Text color={colors.border}>
+                <Text color={colors.textMuted}>
                   {"░".repeat(Math.max(0, 12 - Math.max(1, Math.round((data.calls / maxToolCalls) * 12))))}
                 </Text>
                 <Text color={colors.textDim}> {data.calls}</Text>
@@ -289,8 +359,8 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
                   <Box width={12}>
                     <Text color={colors.text}>{truncate(name, 10)}</Text>
                   </Box>
-                  <Text color={colors.warning}>{"█".repeat(filled)}</Text>
-                  <Text color={colors.border}>{"░".repeat(barW - filled)}</Text>
+                  <Text color={colors.peach}>{"▓".repeat(filled)}</Text>
+                  <Text color={colors.textMuted}>{"░".repeat(barW - filled)}</Text>
                   <Text color={colors.textDim}> {durStr}</Text>
                 </Box>
               );
@@ -314,7 +384,7 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
         </Box>
       </Box>
 
-      <StatusBar hints="1:sessions  2:tools  r:refresh  q:quit" />
+      <StatusBar hints="1:sessions  2:tools  t:time-filter  p/P:project  r:refresh  q:quit" />
     </Box>
   );
 }

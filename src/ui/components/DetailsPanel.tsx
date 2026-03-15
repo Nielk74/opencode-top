@@ -61,8 +61,8 @@ function ProgressBar({
 
   return (
     <Text>
-      <Text color={color}>{"█".repeat(filled)}</Text>
-      <Text color={colors.border}>{"░".repeat(empty)}</Text>
+      <Text color={color}>{"▓".repeat(filled)}</Text>
+      <Text color={colors.textMuted}>{"░".repeat(empty)}</Text>
       <Text color={colors.textDim}> {Math.round(pct * 100)}%</Text>
     </Text>
   );
@@ -130,38 +130,31 @@ function DetailsPanelInner({ workflow, height }: DetailsPanelProps) {
 
   return (
     <Box flexDirection="column" paddingX={1} height={height} overflow="hidden">
-      <Box marginBottom={1}>
-        <Text color={colors.accent} bold>
-          Details
-        </Text>
+      <Box flexDirection="column">
+        <Text color={colors.accent} bold>{data.title}</Text>
+        <Text color={colors.textMuted}>◎ {data.project}</Text>
       </Box>
 
-      <Box flexDirection="column">
-        <Text color={colors.cyan} bold>
-          {data.title}
-        </Text>
-        <Text color={colors.textDim}>{data.project}</Text>
-
+      <Box marginTop={1} flexDirection="column">
+        <Text color={colors.purple} bold>── STATS ──────────────────</Text>
         <StatRow label="Tokens" value={formatTokens(data.tokens)} />
         <StatRow label="Cost" value={`$${data.cost.toFixed(4)}`} color={colors.success} />
         <StatRow label="Duration" value={formatDuration(data.duration)} />
         <StatRow label="Rate" value={`${data.outputRate.toFixed(0)} tok/s`} />
         <StatRow label="Calls" value={data.calls.toString()} />
+      </Box>
 
-        <Box marginTop={1}>
-          <Text color={colors.textDim}>Context</Text>
-        </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text color={colors.textMuted}>context</Text>
         <ProgressBar
           value={data.contextUsage}
           max={data.contextWindow}
-          color={data.contextPct > 0.8 ? colors.warning : colors.accent}
+          color={data.contextPct > 0.8 ? colors.warning : colors.teal}
         />
       </Box>
 
       <Box marginTop={1}>
-        <Text color={colors.purple} bold>
-          Models
-        </Text>
+        <Text color={colors.purple} bold>── MODELS ─────────────────</Text>
       </Box>
       {Array.from(data.modelBreakdown.entries())
         .slice(0, 3)
@@ -169,7 +162,7 @@ function DetailsPanelInner({ workflow, height }: DetailsPanelProps) {
           <Box key={model} flexDirection="row">
             <Text color={colors.text}>{model.slice(0, 25)}</Text>
             <Box flexGrow={1} />
-            <Text color={colors.textDim}>{stats.count}</Text>
+            <Text color={colors.textMuted}>{stats.count}×</Text>
             <Box width={1} />
             <Text color={colors.info}>{formatTokens(stats.tokens)}</Text>
           </Box>
@@ -178,9 +171,7 @@ function DetailsPanelInner({ workflow, height }: DetailsPanelProps) {
       {data.topTools.length > 0 && (
         <>
           <Box marginTop={1}>
-            <Text color={colors.purple} bold>
-              Top Tools
-            </Text>
+            <Text color={colors.purple} bold>── TOOLS ──────────────────</Text>
           </Box>
           {data.topTools.map((tool) => (
             <Box key={tool.name} flexDirection="row">
@@ -197,9 +188,7 @@ function DetailsPanelInner({ workflow, height }: DetailsPanelProps) {
       {data.hasSubAgents && (
         <>
           <Box marginTop={1}>
-            <Text color={colors.purple} bold>
-              Agent Chain
-            </Text>
+            <Text color={colors.purple} bold>── AGENT CHAIN ────────────</Text>
           </Box>
           <AgentChainGraph agentTree={data.agentTree} />
         </>

@@ -52,9 +52,9 @@ function AgentTreeInner({ workflows, selectedId, flatNodes, maxHeight = 20 }: Ag
   return (
     <Box flexDirection="column" paddingX={1} height={maxHeight} overflow="hidden">
       <Box marginBottom={1} flexDirection="row">
-        <Text color={colors.accent} bold>Sessions</Text>
+        <Text color={colors.purple} bold>SESSIONS</Text>
         <Box flexGrow={1} />
-        <Text color={colors.textDim}>{workflows.length}</Text>
+        <Text color={colors.textMuted}>{workflows.length} workflows</Text>
       </Box>
 
       {visibleNodes.map((node) => {
@@ -66,8 +66,8 @@ function AgentTreeInner({ workflows, selectedId, flatNodes, maxHeight = 20 }: Ag
 
         const indent = "  ".repeat(node.depth);
         const prefix = node.depth === 0
-          ? (node.hasChildren ? "▶ " : "● ")
-          : (node.hasChildren ? "├▶ " : "├─ ");
+          ? (node.hasChildren ? "▸ " : "  ")
+          : (node.hasChildren ? "╰▸ " : "╰─ ");
 
         const label = node.depth === 0
           ? truncate(node.session.title ?? node.session.projectName ?? "Untitled", 22)
@@ -76,19 +76,20 @@ function AgentTreeInner({ workflows, selectedId, flatNodes, maxHeight = 20 }: Ag
         const date = formatDate(node.session.timeCreated);
         return (
           <Box key={node.id} flexDirection="row" height={1}>
-            <Box width={1} />
-            <Text
-              color={isSelected ? undefined : colors.text}
-              backgroundColor={isSelected ? colors.accent : undefined}
-              bold={isSelected}
-            >
-              {indent}{prefix}{label}
-            </Text>
+            {isSelected ? (
+              <Text color={colors.bgHighlight} backgroundColor={colors.accent} bold>
+                {`▶ ${indent}${prefix}${label}`}
+              </Text>
+            ) : (
+              <Text color={node.depth === 0 ? colors.text : colors.textDim}>
+                {`  ${indent}${prefix}${label}`}
+              </Text>
+            )}
             <Box flexGrow={1} />
-            {date && <Text color={colors.textDim}>{date} </Text>}
-            <Text color={colors.textDim} dimColor>{formatTokens(tokens.total)}</Text>
+            {date && <Text color={colors.textMuted}>{date} </Text>}
+            <Text color={colors.textDim}>{formatTokens(tokens.total)}</Text>
             <Box width={1} />
-            <Text color={colors.success}>{formatCost(cost)}</Text>
+            <Text color={cost.greaterThan(0) ? colors.success : colors.textMuted}>{formatCost(cost)}</Text>
             <Box width={1} />
           </Box>
         );

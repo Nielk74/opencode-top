@@ -9,14 +9,19 @@ interface StatusBarProps {
 
 function StatusBarInner({ hints, info }: StatusBarProps) {
   return (
-    <Box paddingX={1} height={1} flexDirection="row">
-      <Text color={colors.textDim}>{hints}</Text>
-      {info && (
-        <>
-          <Box flexGrow={1} />
-          <Text color={colors.info}>{info}</Text>
-        </>
-      )}
+    <Box flexDirection="column" height={2}>
+      <Box paddingX={0} height={1}>
+        <Text color={colors.border}>{"─".repeat(200)}</Text>
+      </Box>
+      <Box paddingX={1} height={1} flexDirection="row">
+        <Text color={colors.textMuted}>{hints}</Text>
+        {info && (
+          <>
+            <Box flexGrow={1} />
+            <Text color={colors.info}>{info}</Text>
+          </>
+        )}
+      </Box>
     </Box>
   );
 }

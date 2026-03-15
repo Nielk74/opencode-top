@@ -67,7 +67,7 @@ function SessionsScreenInner({
   const leftWidth = Math.floor(terminalWidth * 0.35);
   const rightWidth = terminalWidth - leftWidth - 2;
 
-  const statusBarHeight = 1;
+  const statusBarHeight = 2;
   const borderRows = 2;
   const innerHeight = contentHeight - statusBarHeight - borderRows;
   const panelHeight = contentHeight - statusBarHeight;
@@ -105,8 +105,8 @@ function SessionsScreenInner({
         <Box
           width={leftWidth}
           height={panelHeight}
-          borderStyle="single"
-          borderColor={colors.border}
+          borderStyle="round"
+          borderColor={colors.borderBright}
           flexDirection="column"
         >
           <AgentTree
@@ -125,21 +125,25 @@ function SessionsScreenInner({
         <Box
           width={rightWidth}
           height={panelHeight}
-          borderStyle="single"
-          borderColor={colors.border}
+          borderStyle="round"
+          borderColor={colors.borderBright}
           flexDirection="column"
         >
           {/* Tab header: 1 row */}
           <Box paddingX={1} height={1} flexDirection="row">
-            <Text color={rightMode === "stats" ? colors.accent : colors.textDim} bold={rightMode === "stats"}>
-              [Stats]
-            </Text>
-            <Text color={colors.textDim}> </Text>
-            <Text color={rightMode === "messages" ? colors.accent : colors.textDim} bold={rightMode === "messages"}>
-              [Messages]
-            </Text>
+            {rightMode === "stats" ? (
+              <Text backgroundColor={colors.bgHighlight} color={colors.accent} bold> Stats </Text>
+            ) : (
+              <Text color={colors.textDim}> Stats </Text>
+            )}
+            <Text color={colors.textMuted}>│</Text>
+            {rightMode === "messages" ? (
+              <Text backgroundColor={colors.bgHighlight} color={colors.accent} bold> Messages </Text>
+            ) : (
+              <Text color={colors.textDim}> Messages </Text>
+            )}
             <Box flexGrow={1} />
-            <Text color={colors.textDim}>Tab:switch</Text>
+            <Text color={colors.textMuted}>Tab:switch</Text>
           </Box>
 
           {rightMode === "stats" ? (

@@ -117,8 +117,8 @@ export function App({ refreshInterval = 2000 }: AppProps) {
     );
   }
 
-  // TabBar = 1 row, leave 1 row spare to stay below Ink's clearTerminal threshold
-  const contentHeight = terminalHeight - 2;
+  // TabBar = 2 rows, leave 1 row spare to stay below Ink's clearTerminal threshold
+  const contentHeight = terminalHeight - 3;
 
   return (
     <Box flexDirection="column" width={terminalWidth} height={terminalHeight - 1}>

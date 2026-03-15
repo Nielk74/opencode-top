@@ -58,11 +58,11 @@ function SuccessBar({ successes, calls, width = 12 }: { successes: number; calls
   const pct = calls > 0 ? successes / calls : 0;
   const filled = Math.round(pct * width);
   const empty = width - filled;
-  const color = pct >= 0.9 ? colors.success : pct >= 0.7 ? colors.warning : colors.error;
+  const color = pct >= 0.9 ? colors.teal : pct >= 0.7 ? colors.warning : colors.error;
   return (
     <Text>
-      <Text color={color}>{"█".repeat(filled)}</Text>
-      <Text color={colors.border}>{"░".repeat(empty)}</Text>
+      <Text color={color}>{"▓".repeat(filled)}</Text>
+      <Text color={colors.textMuted}>{"░".repeat(empty)}</Text>
       <Text color={colors.textDim}> {Math.round(pct * 100)}%</Text>
     </Text>
   );
@@ -92,7 +92,8 @@ function ToolsScreenInner({ workflows, isActive, contentHeight, terminalWidth }:
     }
   }, [allTools, sortKey]);
 
-  const listHeight = contentHeight - 4; // header + status bar + padding
+  const statusBarHeight = 2;
+  const listHeight = contentHeight - statusBarHeight - 3; // header + border
   const clampedIndex = Math.min(selectedIndex, Math.max(0, sortedTools.length - 1));
   const selectedTool = sortedTools[clampedIndex] ?? null;
 
@@ -123,54 +124,51 @@ function ToolsScreenInner({ workflows, isActive, contentHeight, terminalWidth }:
   );
 
   const sortLabels: Record<SortKey, string> = {
-    calls: "Calls",
-    failures: "Failures",
-    avgTime: "Avg Time",
+    calls: "calls",
+    failures: "failures",
+    avgTime: "avg-time",
   };
 
   return (
     <Box flexDirection="column" width={terminalWidth} height={contentHeight}>
       <Box paddingX={1} flexDirection="row">
-        <Text color={colors.accent} bold>
-          Tools
-        </Text>
+        <Text color={colors.accent} bold>◆ TOOLS</Text>
         <Box flexGrow={1} />
-        <Text color={colors.textDim}>
-          sort:{" "}
-          {(["calls", "failures", "avgTime"] as SortKey[]).map((k) => (
-            <Text key={k} color={sortKey === k ? colors.accent : colors.textDim}>
-              [{k === sortKey ? sortLabels[k] : k}]{" "}
-            </Text>
-          ))}
-          Tab:cycle
-        </Text>
+        <Text color={colors.textMuted}>sort: </Text>
+        {(["calls", "failures", "avgTime"] as SortKey[]).map((k) => (
+          <Text key={k} color={sortKey === k ? colors.teal : colors.textMuted}>
+            {sortKey === k ? `[${sortLabels[k]}]` : sortLabels[k]}{" "}
+          </Text>
+        ))}
+        <Text color={colors.textMuted}>Tab:cycle</Text>
       </Box>
 
       <Box flexDirection="row" flexGrow={1}>
         {/* Left: tool list */}
-        <Box width={36} flexDirection="column" borderStyle="single" borderColor={colors.border}>
+        <Box width={36} flexDirection="column" borderStyle="round" borderColor={colors.borderBright}>
           <Box paddingX={1} flexDirection="row">
-            <Text color={colors.textDim} bold>
-              Tool
-            </Text>
+            <Text color={colors.purple} bold>TOOL</Text>
             <Box flexGrow={1} />
-            <Text color={colors.textDim}>calls </Text>
-            <Text color={colors.textDim}>err</Text>
+            <Text color={colors.textMuted}>calls </Text>
+            <Text color={colors.textMuted}>err</Text>
           </Box>
-          {visibleTools.map((tool, i) => {
+          {visibleTools.map((tool) => {
             const isSelected = tool.name === selectedTool?.name;
             return (
               <Box key={tool.name} flexDirection="row" paddingX={1}>
-                <Text
-                  color={isSelected ? colors.accent : colors.textDim}
-                  bold={isSelected}
-                >
-                  {isSelected ? "▶ " : "  "}{truncate(tool.name, 20)}
-                </Text>
+                {isSelected ? (
+                  <Text color={colors.bgHighlight} backgroundColor={colors.accent} bold>
+                    {`▶ ${truncate(tool.name, 20)}`}
+                  </Text>
+                ) : (
+                  <Text color={colors.textDim}>
+                    {`  ${truncate(tool.name, 20)}`}
+                  </Text>
+                )}
                 <Box flexGrow={1} />
-                <Text color={colors.info}>{tool.calls}</Text>
-                <Text color={colors.textDim}> </Text>
-                <Text color={tool.failures > 0 ? colors.error : colors.textDim}>{tool.failures}</Text>
+                <Text color={colors.accentAlt}>{tool.calls}</Text>
+                <Text color={colors.textMuted}> </Text>
+                <Text color={tool.failures > 0 ? colors.error : colors.textMuted}>{tool.failures}</Text>
               </Box>
             );
           })}
@@ -182,56 +180,45 @@ function ToolsScreenInner({ workflows, isActive, contentHeight, terminalWidth }:
         </Box>
 
         {/* Right: detail panel */}
-        <Box flexGrow={1} flexDirection="column" borderStyle="single" borderColor={colors.border} paddingX={1}>
+        <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={colors.borderBright} paddingX={1}>
           {selectedTool ? (
             <>
-              <Text color={colors.cyan} bold>
-                {selectedTool.name}
-              </Text>
+              <Text color={colors.accent} bold>{selectedTool.name}</Text>
               <Box marginTop={1} flexDirection="column">
+                <Text color={colors.purple} bold>── STATS ──────────────────</Text>
                 <Box flexDirection="row">
-                  <Box width={14}>
-                    <Text color={colors.textDim}>Total calls</Text>
-                  </Box>
+                  <Box width={14}><Text color={colors.textMuted}>Total calls</Text></Box>
                   <Text color={colors.text}>{selectedTool.calls}</Text>
                 </Box>
                 <Box flexDirection="row">
-                  <Box width={14}>
-                    <Text color={colors.textDim}>Successes</Text>
-                  </Box>
+                  <Box width={14}><Text color={colors.textMuted}>Successes</Text></Box>
                   <Text color={colors.success}>{selectedTool.successes}</Text>
                 </Box>
                 <Box flexDirection="row">
-                  <Box width={14}>
-                    <Text color={colors.textDim}>Failures</Text>
-                  </Box>
-                  <Text color={selectedTool.failures > 0 ? colors.error : colors.textDim}>
+                  <Box width={14}><Text color={colors.textMuted}>Failures</Text></Box>
+                  <Text color={selectedTool.failures > 0 ? colors.error : colors.textMuted}>
                     {selectedTool.failures}
                   </Text>
                 </Box>
                 <Box flexDirection="row">
-                  <Box width={14}>
-                    <Text color={colors.textDim}>Avg time</Text>
-                  </Box>
+                  <Box width={14}><Text color={colors.textMuted}>Avg time</Text></Box>
                   <Text color={colors.info}>{formatDuration(selectedTool.avgDurationMs)}</Text>
                 </Box>
               </Box>
 
               <Box marginTop={1}>
-                <Text color={colors.textDim}>Success rate </Text>
+                <Text color={colors.textMuted}>success rate </Text>
                 <SuccessBar successes={selectedTool.successes} calls={selectedTool.calls} />
               </Box>
 
               {selectedTool.recentErrors.length > 0 && (
                 <>
                   <Box marginTop={1}>
-                    <Text color={colors.warning} bold>
-                      Recent Errors
-                    </Text>
+                    <Text color={colors.purple} bold>── RECENT ERRORS ──────────</Text>
                   </Box>
                   {selectedTool.recentErrors.map((err, i) => (
                     <Box key={i} flexDirection="row">
-                      <Text color={colors.error}>• </Text>
+                      <Text color={colors.error}>✗ </Text>
                       <Text color={colors.text}>{truncate(err, 60)}</Text>
                     </Box>
                   ))}
