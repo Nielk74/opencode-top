@@ -1,10 +1,10 @@
 {
   "name": "opencode-top",
-  "version": "3.3.5",
+  "version": "3.3.6",
   "description": "Monitor OpenCode AI coding sessions - Token usage, costs, and agent analytics",
   "type": "module",
   "bin": {
-    "opencode-top": "bin/octop.mjs"
+    "opencode-top": "bin/octop.js"
   },
   "scripts": {
     "build": "node build.mjs",

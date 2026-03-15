@@ -73,3 +73,18 @@ cd opencode-top
 npm install
 npm start live   # run from source with tsx
 ```
+
+## Maintenance
+
+### Publishing a new version
+
+1. Make and commit your changes
+2. Bump the version in `package.json`
+3. Build and publish:
+
+```bash
+npm publish --access public
+```
+
+The `prepublishOnly` script runs the build automatically before publishing.
+The bin entry must point to `bin/octop.js` (not `bin/octop.mjs`) — `octop.js` loads the pre-built `dist/cli.mjs` and has no runtime dependencies.
