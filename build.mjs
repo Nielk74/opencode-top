@@ -1,7 +1,9 @@
 import { build } from "esbuild";
-import { mkdirSync, realpathSync } from "fs";
+import { mkdirSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +29,8 @@ await build({
   jsx: "automatic",
   define: {
     "process.env.NODE_ENV": '"production"',
+    "__PKG_VERSION__": JSON.stringify(pkg.version),
+    "__PKG_NAME__": JSON.stringify(pkg.name),
   },
   // Provide require() for CJS deps bundled into the ESM output
   banner: {

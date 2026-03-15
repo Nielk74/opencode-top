@@ -8,9 +8,9 @@ import { groupSessionsToWorkflows } from "./core/agents";
 import { getWorkflowCostSingle, getSessionDuration } from "./core/session";
 import { getPricing } from "./data/pricing";
 
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const pkg = require("../package.json") as { version: string; name: string };
+declare const __PKG_VERSION__: string;
+declare const __PKG_NAME__: string;
+const pkg = { version: __PKG_VERSION__, name: __PKG_NAME__ };
 
 program
   .name(pkg.name)
