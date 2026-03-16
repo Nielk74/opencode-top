@@ -136,9 +136,9 @@ export function App({ refreshInterval = 2000 }: AppProps) {
       loadData();
       return;
     }
-    if (input === "1") { setScreen("sessions"); return; }
-    if (input === "2") { setScreen("tools"); return; }
-    if (input === "3") { setScreen("overview"); return; }
+    if (input === "1") { stdout?.write("\x1b[H\x1b[J"); setScreen("sessions"); return; }
+    if (input === "2") { stdout?.write("\x1b[H\x1b[J"); setScreen("tools"); return; }
+    if (input === "3") { stdout?.write("\x1b[H\x1b[J"); setScreen("overview"); return; }
   });
 
   if (error) {
