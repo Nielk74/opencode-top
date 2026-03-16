@@ -1,5 +1,4 @@
 diff --git a/build/ink.js b/build/ink.js
-index 1234567..abcdefg 100644
 --- a/build/ink.js
 +++ b/build/ink.js
 @@ -119,8 +119,9 @@
@@ -12,3 +11,18 @@ index 1234567..abcdefg 100644
 +            }
              return;
          }
+diff --git a/build/log-update.js b/build/log-update.js
+--- a/build/log-update.js
++++ b/build/log-update.js
+@@ -14,8 +14,11 @@
+         previousOutput = output;
+-        stream.write(ansiEscapes.eraseLines(previousLineCount) + output);
++        stream.write('\x1b[H' + output + '\x1b[J');
+         previousLineCount = output.split('\n').length;
+     };
+     render.clear = () => {
+-        stream.write(ansiEscapes.eraseLines(previousLineCount));
++        stream.write('\x1b[H\x1b[J');
+         previousOutput = '';
+         previousLineCount = 0;
+     };
