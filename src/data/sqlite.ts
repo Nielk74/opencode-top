@@ -1,5 +1,4 @@
-import { Database } from "node-sqlite3-wasm";
-type DatabaseInstance = InstanceType<typeof Database>;
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { z } from "zod";
 import { TokenUsage, type Session, type Interaction, type MessagePart } from "../core/types";
 import * as os from "node:os";
@@ -98,7 +97,7 @@ export function getDbPath(): string {
 }
 
 export function loadSessions(dbPath: string = getDbPath(), sinceMessageTime?: number): { sessions: Session[]; maxMessageTime: number } {
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
 
   const sessions = db
     .prepare(`
@@ -117,7 +116,7 @@ export function loadSessions(dbPath: string = getDbPath(), sinceMessageTime?: nu
     // Only reload sessions that have messages newer than sinceMessageTime
     const updatedSessionIds = db
       .prepare(`SELECT DISTINCT session_id FROM message WHERE time_created > ?`)
-      .all([sinceMessageTime]) as { session_id: string }[];
+      .all(sinceMessageTime) as { session_id: string }[];
     const updatedSet = new Set(updatedSessionIds.map((r) => r.session_id));
     sessionIds = sessions.filter((s) => updatedSet.has(s.id)).map((s) => s.id);
   } else {
@@ -157,7 +156,7 @@ export function loadSessions(dbPath: string = getDbPath(), sinceMessageTime?: nu
 }
 
 function loadInteractions(
-  db: DatabaseInstance,
+  db: DatabaseSync,
   sessionIds: string[]
 ): Map<string, Interaction[]> {
   const result = new Map<string, Interaction[]>();
@@ -173,7 +172,7 @@ function loadInteractions(
     WHERE session_id IN (${placeholders})
     ORDER BY time_created ASC
   `)
-    .all(sessionIds) as DbMessage[];
+    .all(...sessionIds) as DbMessage[];
 
   if (messages.length === 0) return result;
 
@@ -196,7 +195,7 @@ function loadInteractions(
   return result;
 }
 
-function loadParts(db: DatabaseInstance, messageIds: string[]): Map<string, MessagePart[]> {
+function loadParts(db: DatabaseSync, messageIds: string[]): Map<string, MessagePart[]> {
   const result = new Map<string, MessagePart[]>();
 
   if (messageIds.length === 0) return result;
@@ -218,7 +217,7 @@ function loadParts(db: DatabaseInstance, messageIds: string[]): Map<string, Mess
       WHERE message_id IN (${placeholders})
       ORDER BY rowid ASC
     `)
-      .all(messageIds) as DbPart[];
+      .all(...messageIds) as DbPart[];
   } catch {
     // part table may have different schema
     return result;
@@ -369,7 +368,7 @@ function normalizeModelName(model: string): string {
 
 export function sessionExists(dbPath: string = getDbPath()): boolean {
   try {
-    const db = new Database(dbPath);
+    const db = new DatabaseSync(dbPath);
     db.prepare("SELECT 1 FROM session LIMIT 1").get();
     db.close();
     return true;
