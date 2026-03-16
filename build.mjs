@@ -18,7 +18,6 @@ await build({
   outfile: "dist/cli.mjs",
   // Keep native modules and all Node built-ins external
   external: [
-    "better-sqlite3",
     "bufferutil",
     "utf-8-validate",
   ],
