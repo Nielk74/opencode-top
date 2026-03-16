@@ -1,8 +1,14 @@
-122,123c122,125
-<             this.options.stdout.write(ansiEscapes.clearTerminal + this.fullStaticOutput + output);
-<             this.lastOutput = output;
----
->             if (output !== this.lastOutput) {
->                 this.log(output);
->                 this.lastOutput = output;
->             }
+diff --git a/build/ink.js b/build/ink.js
+index 1234567..abcdefg 100644
+--- a/build/ink.js
++++ b/build/ink.js
+@@ -119,8 +119,9 @@
+         if (outputHeight >= this.options.stdout.rows) {
+-            this.options.stdout.write(ansiEscapes.clearTerminal + this.fullStaticOutput + output);
+-            this.lastOutput = output;
++            if (output !== this.lastOutput) {
++                this.log(output);
++                this.lastOutput = output;
++            }
+             return;
+         }
