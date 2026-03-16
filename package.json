@@ -1,6 +1,6 @@
 {
   "name": "opencode-top",
-  "version": "3.5.7",
+  "version": "3.5.8",
   "description": "Monitor OpenCode AI coding sessions - Token usage, costs, and agent analytics",
   "type": "module",
   "files": [
@@ -18,8 +18,7 @@
     "lint": "biome check src",
     "format": "biome format src --write",
     "test": "vitest",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "commander": "^12.1.0",
