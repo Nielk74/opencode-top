@@ -126,19 +126,19 @@ export function App({ refreshInterval = 2000 }: AppProps) {
     };
   }, [loadData, refreshInterval]);
 
+  const switchScreen = useCallback((next: ScreenId) => {
+    if (next === screen) return;
+    stdout?.write("\x1b[H\x1b[J");
+    setScreen(next);
+  }, [screen, stdout]);
+
   // Global: q quit, r refresh, 1-3 tabs
   useInput((input, key) => {
-    if (input === "q" || key.escape) {
-      exit();
-      return;
-    }
-    if (input === "r") {
-      loadData();
-      return;
-    }
-    if (input === "1") { stdout?.write("\x1b[H\x1b[J"); setScreen("sessions"); return; }
-    if (input === "2") { stdout?.write("\x1b[H\x1b[J"); setScreen("tools"); return; }
-    if (input === "3") { stdout?.write("\x1b[H\x1b[J"); setScreen("overview"); return; }
+    if (input === "q" || key.escape) { exit(); return; }
+    if (input === "r") { loadData(); return; }
+    if (input === "1") { switchScreen("sessions"); return; }
+    if (input === "2") { switchScreen("tools"); return; }
+    if (input === "3") { switchScreen("overview"); return; }
   });
 
   if (error) {

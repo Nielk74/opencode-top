@@ -1,5 +1,5 @@
-import React, { useMemo, memo, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import React, { useMemo, memo, useState, useCallback } from "react";
+import { Box, Text, useInput, useStdout } from "ink";
 import { colors } from "../theme";
 import { StatusBar } from "../components/StatusBar";
 import { SparkLine } from "../components/SparkLine";
@@ -110,6 +110,8 @@ function ErrorBar({
 }
 
 function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth }: OverviewScreenProps) {
+  const { stdout } = useStdout();
+  const clearScreen = useCallback(() => stdout?.write("\x1b[H\x1b[J"), [stdout]);
   const pricing = useMemo(() => getAllPricing(), []);
 
   // Filters
@@ -154,12 +156,15 @@ function OverviewScreenInner({ workflows, isActive, contentHeight, terminalWidth
   useInput((input) => {
     if (!isActive) return;
     if (input === "t") {
+      clearScreen();
       setTimeFilterIdx((i) => (i + 1) % TIME_FILTER_OPTIONS.length);
     }
     if (input === "p") {
+      clearScreen();
       setProjectFilterIdx((i) => (i + 1) % (allProjects.length + 1));
     }
     if (input === "P") {
+      clearScreen();
       setProjectFilterIdx((i) => (i - 1 + allProjects.length + 1) % (allProjects.length + 1));
     }
   }, { isActive });
